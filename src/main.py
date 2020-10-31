@@ -2,13 +2,14 @@
 This module takes care of starting the API Server, Loading the DB and Adding the endpoints
 """
 import os
+import json
 from flask import Flask, request, jsonify, url_for
 from flask_migrate import Migrate
 from flask_swagger import swagger
 from flask_cors import CORS
 from utils import APIException, generate_sitemap
 from admin import setup_admin
-from models import db, User
+from models import db, User, Todo
 #from models import Person
 
 app = Flask(__name__)
@@ -30,14 +31,32 @@ def handle_invalid_usage(error):
 def sitemap():
     return generate_sitemap(app)
 
-@app.route('/user', methods=['GET'])
+@app.route('/todos', methods=['GET'])
 def handle_hello():
+    people_query = Todo.query.all()
+    all_people = list(map(lambda x: x.serialize(), people_query))
+    return jsonify(all_people), 200
 
-    response_body = {
-        "msg": "Hello, this is your GET /user response "
-    }
+@app.route('/todos', methods=['POST'])
+def post_item():
+    request_body = json.loads(request.data)
+    todo1 = Todo(label=request_body["label"], done=request_body["done"])
+    db.session.add(todo1)
+    db.session.commit()
+    people_query = Todo.query.all()
+    all_people = list(map(lambda x: x.serialize(), people_query))
+    return jsonify(all_people), 200
 
-    return jsonify(response_body), 200
+@app.route('/todos/<int:id>', methods=['DELETE'])
+def delete_item(id):
+    todo = Todo.query.get(id)
+    if todo is None:
+        raise APIException('User not found', status_code=404)
+    db.session.delete(todo)
+    db.session.commit()
+    people_query = Todo.query.all()
+    all_people = list(map(lambda x: x.serialize(), people_query))
+    return jsonify(all_people), 200
 
 # this only runs if `$ python src/main.py` is executed
 if __name__ == '__main__':
